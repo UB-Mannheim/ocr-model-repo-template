@@ -1,14 +1,10 @@
-name: gtrepo
+name: ocr-model-repo
 on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       
-      
-      
   workflow_dispatch:
-
-
 
 jobs:
     job1:
@@ -32,9 +28,9 @@ jobs:
           - name: install analyse xsl-styles
             id: step2
             run: | 
-                git clone https://github.com/tboenig/gt-repo-scripts.git
-                mv gt-repo-scripts/scripts scripts/
-                rm -r gt-repo-scripts
+                git clone https://github.com/jkamlah/ocr-model-repo-scripts.git
+                mv ocr-model-repo-scripts/scripts scripts/
+                rm -r ocr-model-repo-scripts
           
           - name: Download and install saxon
             id: step3
@@ -57,12 +53,12 @@ jobs:
 
           - name: PathTest
             run: |
-                java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_unitTest.xsl \
+                java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_unitTest.xsl \
                 output=unitTest1 \
-                -s:scripts/gt-overview_unitTest.xsl -o:ghout/pathtest.md
+                -s:scripts/ocr-model-overview_unitTest.xsl -o:ghout/pathtest.md
             shell: bash
 
-          # Test GT-Page Folder Repo Structure
+          # Test ocr-model-Page Folder Repo Structure
           
           - name: Empty
             id: step4
@@ -80,7 +76,7 @@ jobs:
    
     
     job2:
-        name: analyse_and_makebagit
+        name: publish
         needs: job1
         if: ${{needs.job1.outputs.output1 == 'empty'}}        
         runs-on: ubuntu-latest
@@ -98,24 +94,20 @@ jobs:
             
           - name: install analyse xsl-styles
             run: | 
-              git clone https://github.com/tboenig/gt-repo-scripts.git
-              mv gt-repo-scripts/scripts scripts/
-              rm -r gt-repo-scripts
+              git clone https://github.com/jkamlah/ocr-model-repo-scripts.git
+              mv ocr-model-repo-scripts/scripts scripts/
+              rm -r ocr-model-repo-scripts
       
             # Installation GT-Labelling Documentation
-      
-            
           - name: install labeling
             run: |
               git clone https://github.com/tboenig/gt-guidelines.git
       
             
           # Installation and Directories
-            
           - name: install jq
             run: sudo apt-get install jq
           
-                      
           - name: Download and install saxon
             run: |
               wget https://github.com/Saxonica/Saxon-HE/releases/download/SaxonHE12-3/SaxonHE12-3J.zip 
@@ -123,9 +115,6 @@ jobs:
                             
           - name: make metadata_out
             run: mkdir metadata_out
-      
-          - name: make ocrdzip_out
-            run: mkdir ocrdzip_out
             
           - name: make gh-pages_out
             run: mkdir ghout
@@ -133,11 +122,8 @@ jobs:
           - name: make readme_out 
             run:  sh scripts/readmefolder.sh
       
-      
           - name: readme.xml file
             run: sh scripts/xreadme.sh  
-      
-                
           
           # Transformation and analyzing
           
@@ -147,46 +133,39 @@ jobs:
             with:
               cmd: yq -o=json METADATA.yml > METADATA.json
                   
-          - name: transform METADATA and make GT-Overview
+          - name: transform METADATA and make OCR-Model-Overview
             run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
+              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
               output=METADATA repoBase=$GITHUB_REF_NAME repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/gt-overview_metadata.xsl -o:ghout/metadata.md
+              -s:scripts/ocr-model-overview_metadata.xsl -o:ghout/metadata.md
             shell: bash
       
           - name: make Compressed table view
             run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
+              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
               output=TABLE repoBase=$GITHUB_REF_NAME repoName=$GITHUB_REPOSITORY \
-              -s:scripts/gt-overview_metadata.xsl -o:ghout/table.md
+              -s:scripts/ocr-model-overview_metadata.xsl -o:ghout/table.md
             shell: bash
       
           - name: detailed table view 
             run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
+              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
               output=OVERVIEW repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY \
-              -s:scripts/gt-overview_metadata.xsl -o:ghout/overview.md
+              -s:scripts/ocr-model-overview_metadata.xsl -o:ghout/overview.md
             shell: bash
 
           - name: leveling the volume and documents 
             run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-level_parser.xsl \
+              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-level_parser.xsl \
               repoName=$GITHUB_REPOSITORY \
-              -s:scripts/gt-level_parser.xsl -o:ghout/overview-level.md
+              -s:scripts/ocr-model-level_parser.xsl -o:ghout/overview-level.md
             shell: bash  
-      
-          - name: generate mets.sh
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
-              output=METS repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY \
-              -s:scripts/gt-overview_metadata.xsl -o:scripts/mets.sh
-            shell: bash
             
           - name: generate Metadata JSON file
             run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
+              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
               output=METAJSON repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/gt-overview_metadata.xsl -o:metadata_out/metadata_l.json
+              -s:scripts/ocr-model-overview_metadata.xsl -o:metadata_out/metadata_l.json
             shell: bash
             
             
@@ -194,42 +173,28 @@ jobs:
             run: |
               jq '.' metadata_out/metadata_l.json > metadata_out/metadata.json
               cp metadata_out/metadata.json ghout/
-              rm metadata_out/metadata_l.json
-            
+              rm metadata_out/metadata_l.json        
             
           - name: generate README
             run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
+              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
               output=README repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY \
-              -s:scripts/gt-overview_metadata.xsl -o:README.md
+              -s:scripts/ocr-model-overview_metadata.xsl -o:README.md
             shell: bash
             
-          - name: generate METS Volume File
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
-              output=METSvolume repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/gt-overview_metadata.xsl -o:metadata_out/mets.xml
-            shell: bash
       
           - name: generate release download List
             run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
+              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
               output=download repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/gt-overview_metadata.xsl -o:ghout/download.txt
+              -s:scripts/ocr-model-overview_metadata.xsl -o:ghout/download.txt
             shell: bash  
-            
-          - name: delete fileGrp DEFAULT
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
-              output=METSdefault repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/gt-overview_metadata.xsl
-            shell: bash
 
           - name: generate CITATION.cff
             run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/gt-overview_metadata.xsl \
+              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
               output=CITATION repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/gt-overview_metadata.xsl -o:rawCITATION.cff
+              -s:scripts/ocr-model-overview_metadata.xsl -o:rawCITATION.cff
             shell: bash
 
           - name: formating CITATION.cff
@@ -239,7 +204,6 @@ jobs:
               cmd: |
                 yq -I4 rawCITATION.cff > CITATION.cff
                 rm rawCITATION.cff
-            
         
           - name: Index-link
             run: |
@@ -247,34 +211,7 @@ jobs:
                 ln -s metadata.md index.md
     
       
-          # Mets handling, Install OCR-D and Bagit 
-      
-          - name: del invalidMets
-            run: sh -ex scripts/data_mets.sh
-            shell: bash    
-              
-
-          - name: install ocrd, make validMets and bagit
-            run: |
-              sudo apt-get install -y python3 imagemagick libgeos-dev
-              python3 -m venv venv         
-              source venv/bin/activate     
-              pip install -U pip 'setuptools>=61'
-              pip install ocrd
-              ocrd --version
-              
-
-          - name: make validMets  
-            run: |
-              source venv/bin/activate
-              sh -ex scripts/mets.sh
-                  
-
-          - name: make bagit
-            run: |
-              source venv/bin/activate
-              sh scripts/data_structure.sh
-      
+          # CSS-Style
       
           - name: copy css styles, js javascript and yml files to ghout
             run: | 
@@ -282,7 +219,8 @@ jobs:
               cp scripts/levelparser.css ghout/
               cp scripts/lang.js ghout/
               cp scripts/_config.yml ghout/ 
-      
+
+          # Release
       
           - name: archive the metadata files from metadata_out folder
             uses: thedoctor0/zip-release@master
@@ -336,7 +274,7 @@ jobs:
               git push origin HEAD:main    
       
       
-          - name: Deploy GT-Overview to GitHub Pages 🚀
+          - name: Deploy OCR-Model-Overview to GitHub Pages 🚀
             uses: JamesIves/github-pages-deploy-action@v4.4.1
             with:
                 branch: gh-pages # The branch the action should deploy to.
