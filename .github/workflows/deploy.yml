@@ -1,250 +1,71 @@
-name: ocr-model-repo
+name: model-repo
 on:
   push:
     tags:
+      - '[vV]{0,1}[0-9]+.[0-9]+.[0-9]+'
       - 'v[0-9]+.[0-9]+.[0-9]+'
-      
   workflow_dispatch:
 
 jobs:
-    job1:
-        name: uniTest
-        runs-on: ubuntu-latest
-        permissions:
-            checks: write
-            contents: write
-        # Map a step output to a job output
-        outputs:
-          output1: ${{ steps.step4.outputs.test }}
-          output2: ${{ steps.step4.outputs.test2 }}
-          
-        steps:
-          - name: Git checkout
-            id: step1
-            uses: actions/checkout@v3
+  gh-pages:
+    name: pages and readme
+    runs-on: ubuntu-latest
 
-           # Installation Styles and Saxon
-      
-          - name: install analyse xsl-styles
-            id: step2
-            run: | 
-                git clone https://github.com/jkamlah/ocr-model-repo-scripts.git
-                mv ocr-model-repo-scripts/scripts scripts/
-                rm -r ocr-model-repo-scripts
-          
-          - name: Download and install saxon
-            id: step3
-            run: |
-              wget https://github.com/Saxonica/Saxon-HE/releases/download/SaxonHE12-3/SaxonHE12-3J.zip 
-              unzip SaxonHE12-3J.zip      
-          
+    permissions:
+      checks: write
+      contents: write
 
-           # Installation and Directories   
-          
-          - name: make gh-pages_out
-            run: mkdir ghout
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
 
+      # Combine installation steps to reduce the number of steps and improve readability
+      - name: Install dependencies
+        run: |
+          git clone https://github.com/jkamlah/ocr-model-repo-scripts.git
+          git clone https://github.com/tboenig/gt-guidelines.git
+          sudo apt-get update
+          sudo apt-get install -y jq python3 python3-poetry
 
-          - name: Get SDK Version from config
-            id: lookupSdkVersion
-            uses: mikefarah/yq@master
-            with:
-             cmd: yq -o=json METADATA.yml > METADATA.json  
+      # Setup Python environment in a single step
+      - name: Setup Python and dependencies
+        run: |
+          cd ocr-model-repo-scripts/
+          poetry install
+          source $(poetry env info --path)/bin/activate
 
-          - name: PathTest
-            run: |
-                java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_unitTest.xsl \
-                output=unitTest1 \
-                -s:scripts/ocr-model-overview_unitTest.xsl -o:ghout/pathtest.md
-            shell: bash
+      # Run scripts as a single job to avoid repetitive activation of the environment
+      - name: Process metadata and update documentation
+        run: |
+          cd ocr-model-repo-scripts/
+          source $(poetry env info --path)/bin/activate
+          poetry run python3 scripts/model.py yaml2json ../
+          poetry run python3 scripts/model.py metadata ../
+          poetry run python3 scripts/model.py index ../
+          poetry run python3 scripts/model.py readme ../ --title ${{ github.event.repository.name }} --gh-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          mv index.md ../docs/
+          cp scripts/table_hide.css scripts/levelparser.css scripts/lang.js scripts/_config.yml ../docs/
 
-          # Test ocr-model-Page Folder Repo Structure
-          
-          - name: Empty
-            id: step4
-            run: |
-                [ -s ghout/pathtest.md ] || echo "test=empty" >> $GITHUB_OUTPUT
-                [ ! -s ghout/pathtest.md ] || echo "test2=full" >> $GITHUB_OUTPUT
-          
-          # Error Logview     
-          
-          - name: uniTestError
-            id: step5
-            if: ${{steps.step4.outputs.test2 == 'full'}}  
-            run: |
-              less ghout/pathtest.md          
-   
-    
-    job2:
-        name: publish
-        needs: job1
-        if: ${{needs.job1.outputs.output1 == 'empty'}}        
-        runs-on: ubuntu-latest
-        permissions:
-            checks: write
-            contents: write
-              
-        
-        steps:
-  
-          - name: Git checkout
-            uses: actions/checkout@v3
-      
-            # Installation Styles
-            
-          - name: install analyse xsl-styles
-            run: | 
-              git clone https://github.com/jkamlah/ocr-model-repo-scripts.git
-              mv ocr-model-repo-scripts/scripts scripts/
-              rm -r ocr-model-repo-scripts
-      
-            # Installation GT-Labelling Documentation
-          - name: install labeling
-            run: |
-              git clone https://github.com/tboenig/gt-guidelines.git
-      
-            
-          # Installation and Directories
-          - name: install jq
-            run: sudo apt-get install jq
-          
-          - name: Download and install saxon
-            run: |
-              wget https://github.com/Saxonica/Saxon-HE/releases/download/SaxonHE12-3/SaxonHE12-3J.zip 
-              unzip SaxonHE12-3J.zip
-                            
-          - name: make metadata_out
-            run: mkdir metadata_out
-            
-          - name: make gh-pages_out
-            run: mkdir ghout
-            
-          - name: make readme_out 
-            run:  sh scripts/readmefolder.sh
-      
-          - name: readme.xml file
-            run: sh scripts/xreadme.sh  
-          
-          # Transformation and analyzing
-          
-          - name: Get SDK Version from config
-            id: lookupSdkVersion
-            uses: mikefarah/yq@master
-            with:
-              cmd: yq -o=json METADATA.yml > METADATA.json
-                  
-          - name: transform METADATA and make OCR-Model-Overview
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
-              output=METADATA repoBase=$GITHUB_REF_NAME repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/ocr-model-overview_metadata.xsl -o:ghout/metadata.md
-            shell: bash
-      
-          - name: make Compressed table view
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
-              output=TABLE repoBase=$GITHUB_REF_NAME repoName=$GITHUB_REPOSITORY \
-              -s:scripts/ocr-model-overview_metadata.xsl -o:ghout/table.md
-            shell: bash
-      
-          - name: detailed table view 
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
-              output=OVERVIEW repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY \
-              -s:scripts/ocr-model-overview_metadata.xsl -o:ghout/overview.md
-            shell: bash
+      # Add a step to check for changes
+      - name: Check for changes
+        id: changes_check
+        run: |
+          if git diff --quiet; then
+            echo "No changes detected."
+            echo "CHANGES_DETECTED=false" >> $GITHUB_ENV
+          else
+            echo "Changes detected."
+            echo "CHANGES_DETECTED=true" >> $GITHUB_ENV
+          fi
 
-          - name: leveling the volume and documents 
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-level_parser.xsl \
-              repoName=$GITHUB_REPOSITORY \
-              -s:scripts/ocr-model-level_parser.xsl -o:ghout/overview-level.md
-            shell: bash  
-            
-          - name: generate Metadata JSON file
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
-              output=METAJSON repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/ocr-model-overview_metadata.xsl -o:metadata_out/metadata_l.json
-            shell: bash
-            
-            
-          - name: format json file and copy to gh branch
-            run: |
-              jq '.' metadata_out/metadata_l.json > metadata_out/metadata.json
-              cp metadata_out/metadata.json ghout/
-              rm metadata_out/metadata_l.json        
-            
-          - name: generate README
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
-              output=README repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY \
-              -s:scripts/ocr-model-overview_metadata.xsl -o:README.md
-            shell: bash
-            
-          - name: generate release download List
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
-              output=download repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/ocr-model-overview_metadata.xsl -o:ghout/download.txt
-            shell: bash  
-
-          - name: generate CITATION.cff
-            run: |
-              java -jar saxon-he-12.3.jar -xsl:scripts/ocr-model-overview_metadata.xsl \
-              output=CITATION repoBase=$GITHUB_REF_Name repoName=$GITHUB_REPOSITORY bagitDumpNum=$GITHUB_RUN_NUMBER releaseTag=$GITHUB_REF_NAME \
-              -s:scripts/ocr-model-overview_metadata.xsl -o:rawCITATION.cff
-            shell: bash
-
-          - name: formating CITATION.cff
-            id: lookupSdkVersion2
-            uses: mikefarah/yq@master
-            with:
-              cmd: |
-                yq -I4 rawCITATION.cff > CITATION.cff
-                rm rawCITATION.cff
-        
-          - name: Index-link
-            run: |
-                cd ghout
-                ln -s metadata.md index.md
-    
-          # CSS-Style
-      
-          - name: copy css styles, js javascript and yml files to ghout
-            run: | 
-              cp scripts/table_hide.css ghout/
-              cp scripts/levelparser.css ghout/
-              cp scripts/lang.js ghout/
-              cp scripts/_config.yml ghout/ 
-
-          # Release
-      
-          - name: archive the metadata files from metadata_out folder
-            uses: thedoctor0/zip-release@master
-            with:
-                filename: metadata-v${{ github.run_number }}.zip
-                path: 'metadata_out'             
-            
-          - name: Commit README
-            run: |
-              git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              git config --local user.name "github-actions[bot]"
-              git add README.md
-              git commit -m "[Automatic] Update readme files" || echo "Nothing to update"
-              git push origin HEAD:main
-
-          - name: Commit CITATION.cff
-            run: |
-              git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              git config --local user.name "github-actions[bot]"
-              git add CITATION.cff
-              git commit -m "[Automatic] Update CITATION.cff files" || echo "Nothing to update"
-              git push origin HEAD:main    
-      
-      
-          - name: Deploy OCR-Model-Overview to GitHub Pages 🚀
-            uses: JamesIves/github-pages-deploy-action@v4.4.1
-            with:
-                branch: gh-pages # The branch the action should deploy to.
-                folder: ghout  # The folder the action should deploy.
+      # Conditional commit step
+      - name: Commit and Push changes
+        if: env.CHANGES_DETECTED == 'true'
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add README.md
+          git add docs/
+          git add data/
+          git commit -m "[Automatic] Update README and METADATA"
+          git push origin HEAD:main
